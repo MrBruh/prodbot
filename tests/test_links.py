@@ -1,9 +1,10 @@
 """Tests for the Links cog."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import aiosqlite
 import pytest
 import pytest_asyncio
-import aiosqlite
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import database
 from cogs.links import Links, _dict_factory

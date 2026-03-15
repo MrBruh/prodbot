@@ -1,10 +1,11 @@
 """Tests for the Todos cog."""
 
+from datetime import date
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import aiosqlite
 import pytest
 import pytest_asyncio
-import aiosqlite
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import date
 
 import database
 from cogs.todos import Todos, _dict_factory

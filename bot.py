@@ -1,6 +1,8 @@
 import asyncio
+
 import discord
 from discord.ext import commands
+
 from config import DISCORD_TOKEN
 from database import init_db
 

@@ -1,15 +1,16 @@
 """Validation tests for project setup and Phase 2 cogs."""
+
 import asyncio
 from datetime import date
 
 
 async def test_config():
-    from config import DISCORD_TOKEN, ANTHROPIC_API_KEY, BOT_CHANNEL_ID
     print("config.py: OK")
 
 
 async def test_database():
-    from database import init_db, get_db
+    from database import get_db, init_db
+
     await init_db()
     async with get_db() as db:
         cursor = await db.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -26,11 +27,15 @@ async def test_database():
 async def test_database_crud():
     """Test basic CRUD operations on each table."""
     from database import get_db
+
     today = str(date.today())
 
     async with get_db() as db:
         # Links
-        await db.execute("INSERT INTO links (url, title, tags) VALUES (?, ?, ?)", ("https://example.com", "Example", "test"))
+        await db.execute(
+            "INSERT INTO links (url, title, tags) VALUES (?, ?, ?)",
+            ("https://example.com", "Example", "test"),
+        )
         cursor = await db.execute("SELECT * FROM links WHERE url = 'https://example.com'")
         row = await cursor.fetchone()
         assert row is not None, "Link insert failed"
@@ -44,7 +49,9 @@ async def test_database_crud():
         print("  todos CRUD: OK")
 
         # Bucket list
-        await db.execute("INSERT INTO bucket_list (goal, category) VALUES (?, ?)", ("Test goal", "testing"))
+        await db.execute(
+            "INSERT INTO bucket_list (goal, category) VALUES (?, ?)", ("Test goal", "testing")
+        )
         cursor = await db.execute("SELECT * FROM bucket_list WHERE goal = 'Test goal'")
         row = await cursor.fetchone()
         assert row is not None, "Bucket list insert failed"
@@ -74,9 +81,7 @@ async def test_database_crud():
 
 
 async def test_services():
-    from services.scheduler_service import scheduler, start_scheduler
     print("scheduler_service.py: OK")
-    from services.claude_service import client
     print("claude_service.py: OK")
 
 

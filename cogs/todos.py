@@ -1,7 +1,9 @@
+from datetime import date
+
 import discord
 from discord.ext import commands
+
 from database import get_db
-from datetime import date
 
 
 class Todos(commands.Cog):
@@ -18,9 +20,7 @@ class Todos(commands.Cog):
         """Add a task for today. Usage: !todo add <task>"""
         today = str(date.today())
         async with get_db() as db:
-            await db.execute(
-                "INSERT INTO todos (date, task) VALUES (?, ?)", (today, task)
-            )
+            await db.execute("INSERT INTO todos (date, task) VALUES (?, ?)", (today, task))
             await db.commit()
         await ctx.send(f"Added: **{task}**")
 
@@ -28,9 +28,7 @@ class Todos(commands.Cog):
     async def todo_done(self, ctx, task_id: int):
         """Mark a task as complete. Usage: !todo done <id>"""
         async with get_db() as db:
-            cursor = await db.execute(
-                "UPDATE todos SET completed = 1 WHERE id = ?", (task_id,)
-            )
+            cursor = await db.execute("UPDATE todos SET completed = 1 WHERE id = ?", (task_id,))
             await db.commit()
             if cursor.rowcount == 0:
                 await ctx.send(f"No task found with ID {task_id}.")

@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+
 from database import get_db
 from services.claude_service import summarize_url
 
@@ -37,11 +38,15 @@ class Links(commands.Cog):
         async with get_db() as db:
             db.row_factory = _dict_factory
             if filter == "read":
-                cursor = await db.execute("SELECT * FROM links WHERE read = 1 ORDER BY saved_at DESC")
+                cursor = await db.execute(
+                    "SELECT * FROM links WHERE read = 1 ORDER BY saved_at DESC"
+                )
             elif filter == "all":
                 cursor = await db.execute("SELECT * FROM links ORDER BY saved_at DESC")
             else:
-                cursor = await db.execute("SELECT * FROM links WHERE read = 0 ORDER BY saved_at DESC")
+                cursor = await db.execute(
+                    "SELECT * FROM links WHERE read = 0 ORDER BY saved_at DESC"
+                )
             links = await cursor.fetchall()
 
         if not links:
@@ -65,9 +70,7 @@ class Links(commands.Cog):
     async def mark_read(self, ctx, link_id: int):
         """Mark a link as read. Usage: !read <id>"""
         async with get_db() as db:
-            cursor = await db.execute(
-                "UPDATE links SET read = 1 WHERE id = ?", (link_id,)
-            )
+            cursor = await db.execute("UPDATE links SET read = 1 WHERE id = ?", (link_id,))
             await db.commit()
             if cursor.rowcount == 0:
                 await ctx.send(f"No link found with ID {link_id}.")

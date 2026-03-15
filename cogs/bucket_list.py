@@ -1,7 +1,9 @@
+from datetime import datetime
+
 import discord
 from discord.ext import commands
+
 from database import get_db
-from datetime import datetime
 
 
 class BucketList(commands.Cog):
@@ -65,9 +67,7 @@ class BucketList(commands.Cog):
     async def _show_goals(self, ctx):
         async with get_db() as db:
             db.row_factory = _dict_factory
-            cursor = await db.execute(
-                "SELECT * FROM bucket_list ORDER BY category, status, id"
-            )
+            cursor = await db.execute("SELECT * FROM bucket_list ORDER BY category, status, id")
             goals = await cursor.fetchall()
 
         if not goals:

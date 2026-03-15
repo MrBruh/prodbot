@@ -1,10 +1,8 @@
 """Unit tests for database CRUD operations on all tables."""
 
-import os
-import tempfile
+import aiosqlite
 import pytest
 import pytest_asyncio
-import aiosqlite
 
 # We import init_db and patch DB_PATH so it uses a temp file.
 import database
@@ -183,9 +181,7 @@ class TestBucketListTable:
                 ("Goal", "general"),
             )
             await db.commit()
-            await db.execute(
-                "UPDATE bucket_list SET status = 'in_progress' WHERE id = 1"
-            )
+            await db.execute("UPDATE bucket_list SET status = 'in_progress' WHERE id = 1")
             await db.commit()
             db.row_factory = _dict_factory
             cur = await db.execute("SELECT status FROM bucket_list WHERE id = 1")
@@ -286,9 +282,7 @@ class TestRemindersTable:
     @pytest.mark.asyncio
     async def test_update_fired(self, db_path):
         async with aiosqlite.connect(db_path) as db:
-            await db.execute(
-                "INSERT INTO reminders (message) VALUES (?)", ("Reminder",)
-            )
+            await db.execute("INSERT INTO reminders (message) VALUES (?)", ("Reminder",))
             await db.commit()
             await db.execute("UPDATE reminders SET fired = 1 WHERE id = 1")
             await db.commit()
@@ -301,9 +295,7 @@ class TestRemindersTable:
     @pytest.mark.asyncio
     async def test_delete(self, db_path):
         async with aiosqlite.connect(db_path) as db:
-            await db.execute(
-                "INSERT INTO reminders (message) VALUES (?)", ("Reminder",)
-            )
+            await db.execute("INSERT INTO reminders (message) VALUES (?)", ("Reminder",))
             await db.commit()
             await db.execute("DELETE FROM reminders WHERE id = 1")
             await db.commit()

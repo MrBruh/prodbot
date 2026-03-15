@@ -1,4 +1,5 @@
 import anthropic
+
 from config import ANTHROPIC_API_KEY
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -21,18 +22,16 @@ async def summarize_url(url: str) -> str:
 
 async def reflect_on_day(todos: list, journal_entries: list) -> str:
     """Ask Claude to summarize the user's day."""
-    todo_text = "\n".join(
-        f"- [{'x' if t['completed'] else ' '}] {t['task']}" for t in todos
-    )
+    todo_text = "\n".join(f"- [{'x' if t['completed'] else ' '}] {t['task']}" for t in todos)
     journal_text = "\n".join(f"- {e['entry']}" for e in journal_entries)
 
     prompt = f"""Here's a summary of the user's day:
 
 Tasks:
-{todo_text or 'No tasks today.'}
+{todo_text or "No tasks today."}
 
 Journal entries:
-{journal_text or 'No journal entries.'}
+{journal_text or "No journal entries."}
 
 Write a brief, encouraging reflection (2-3 sentences) about their day. Note what they accomplished and gently suggest what they might follow up on tomorrow."""
 

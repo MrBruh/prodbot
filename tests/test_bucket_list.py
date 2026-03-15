@@ -1,9 +1,10 @@
 """Tests for the BucketList cog."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import aiosqlite
 import pytest
 import pytest_asyncio
-import aiosqlite
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import database
 from cogs.bucket_list import BucketList, _dict_factory
@@ -127,9 +128,7 @@ class TestGoalDone:
 
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = _dict_factory
-            cur = await db.execute(
-                "SELECT status, completed_at FROM bucket_list WHERE id = 1"
-            )
+            cur = await db.execute("SELECT status, completed_at FROM bucket_list WHERE id = 1")
             row = await cur.fetchone()
 
         assert row["status"] == "done"
@@ -153,9 +152,7 @@ class TestShowGoals:
         with _patch_get_db(db_path):
             await cog._show_goals(ctx)
 
-        ctx.send.assert_called_once_with(
-            "No goals yet. Add one with `!goal add <goal> #category`"
-        )
+        ctx.send.assert_called_once_with("No goals yet. Add one with `!goal add <goal> #category`")
 
     @pytest.mark.asyncio
     async def test_goals_grouped_by_category(self, cog, ctx, db_path):

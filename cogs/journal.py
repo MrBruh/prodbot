@@ -1,8 +1,11 @@
+from datetime import date
+from typing import Optional
+
 import discord
 from discord.ext import commands
+
 from database import get_db
 from services.claude_service import reflect_on_day
-from datetime import date
 
 
 class Journal(commands.Cog):
@@ -14,14 +17,12 @@ class Journal(commands.Cog):
         """Log a progress entry for today. Usage: !log <entry>"""
         today = str(date.today())
         async with get_db() as db:
-            await db.execute(
-                "INSERT INTO journal (date, entry) VALUES (?, ?)", (today, entry)
-            )
+            await db.execute("INSERT INTO journal (date, entry) VALUES (?, ?)", (today, entry))
             await db.commit()
-        await ctx.send(f"Logged for today.")
+        await ctx.send("Logged for today.")
 
     @commands.command(name="journal")
-    async def view_journal(self, ctx, target_date: str = None):
+    async def view_journal(self, ctx, target_date: Optional[str] = None):
         """View journal entries for a date. Usage: !journal [date]"""
         target_date = target_date or str(date.today())
 
@@ -37,9 +38,7 @@ class Journal(commands.Cog):
             await ctx.send(f"No journal entries for {target_date}.")
             return
 
-        embed = discord.Embed(
-            title=f"Journal — {target_date}", color=discord.Color.teal()
-        )
+        embed = discord.Embed(title=f"Journal — {target_date}", color=discord.Color.teal())
         for e in entries:
             time_str = e["created_at"].split(" ")[-1][:5] if " " in (e["created_at"] or "") else ""
             embed.add_field(
@@ -56,14 +55,10 @@ class Journal(commands.Cog):
 
         async with get_db() as db:
             db.row_factory = _dict_factory
-            cursor = await db.execute(
-                "SELECT task, completed FROM todos WHERE date = ?", (today,)
-            )
+            cursor = await db.execute("SELECT task, completed FROM todos WHERE date = ?", (today,))
             todos = await cursor.fetchall()
 
-            cursor = await db.execute(
-                "SELECT entry FROM journal WHERE date = ?", (today,)
-            )
+            cursor = await db.execute("SELECT entry FROM journal WHERE date = ?", (today,))
             entries = await cursor.fetchall()
 
         if not todos and not entries:
