@@ -2,6 +2,7 @@ discord.py
 anthropic
 aiosqlite
 apscheduler
+sqlalchemy
 python-dotenv
 google-api-python-client
 google-auth-httplib2
