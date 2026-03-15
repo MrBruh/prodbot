@@ -62,9 +62,9 @@ class Todos(commands.Cog):
         pct = int((completed / total) * 100) if total else 0
 
         lines = []
-        for t in tasks:
+        for i, t in enumerate(tasks, 1):
             icon = "done" if t["completed"] else "  "
-            lines.append(f"[{icon}] {t['id']}. {t['task']}")
+            lines.append(f"[{icon}] {i}. {t['task']} (#{t['id']})")
 
         task_list = "\n".join(lines)
         embed = discord.Embed(

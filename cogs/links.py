@@ -57,8 +57,8 @@ class Links(commands.Cog):
             title=f"Links ({filter})",
             color=discord.Color.blue(),
         )
-        for link in links[:15]:
-            name = f"#{link['id']} — {link['title'] or 'Untitled'}"
+        for i, link in enumerate(links[:15], 1):
+            name = f"{i}. {link['title'] or 'Untitled'} (#{link['id']})"
             value = link["url"]
             if link["tags"]:
                 value += f"\nTags: {link['tags']}"
