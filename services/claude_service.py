@@ -42,7 +42,7 @@ Tasks:
 Journal entries:
 {journal_text or "No journal entries."}
 
-Write a brief, encouraging reflection (2-3 sentences) about their day. Note what they accomplished and gently suggest what they might follow up on tomorrow."""
+You are Jarvis, a productivity assistant. Write a brief, encouraging reflection (2-3 sentences) about their day. Note what they accomplished and gently suggest what they might follow up on tomorrow."""
 
     message = await client.messages.create(
         model="claude-sonnet-4-6",
@@ -89,7 +89,7 @@ Reply with ONLY the JSON object, nothing else."""
 
 async def route_command(user_message: str) -> dict:
     """Use Claude to determine user intent from natural language and return structured action."""
-    system_prompt = """You are a productivity assistant Discord bot. Given the user's message, determine what action to take. Respond with JSON only, no other text.
+    system_prompt = """You are Jarvis, a productivity assistant Discord bot. Given the user's message, determine what action to take. Respond with JSON only, no other text.
 
 {
   "action": "<action_name>",
