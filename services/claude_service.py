@@ -102,6 +102,7 @@ Available actions:
 - add_todos: parameters: {"tasks": ["task1", "task2", ...]} (multiple tasks)
 - list_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
 - complete_todo: parameters: {"task_id": <int>}
+- remove_todo: parameters: {"task_id": <int>}
 - clear_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
 - save_link: parameters: {"url": "...", "tags": "..."}
 - list_links: parameters: {"filter": "unread|read|all"}

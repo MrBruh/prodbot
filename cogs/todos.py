@@ -40,6 +40,20 @@ class Todos(commands.Cog):
         """View tasks for a specific date. Usage: !todo date 2025-03-20"""
         await self._show_tasks(ctx, target_date)
 
+    @todo.command(name="remove")
+    async def todo_remove(self, ctx, task_id: int):
+        """Remove a task by ID. Usage: !todo remove <id>"""
+        async with get_db() as db:
+            db.row_factory = _dict_factory
+            cursor = await db.execute("SELECT * FROM todos WHERE id = ?", (task_id,))
+            row = await cursor.fetchone()
+            if not row:
+                await ctx.send(f"No task found with ID #{task_id}.")
+                return
+            await db.execute("DELETE FROM todos WHERE id = ?", (task_id,))
+            await db.commit()
+        await ctx.send(f"Removed: **{row['task']}** (#{task_id})")
+
     @todo.command(name="clear")
     async def todo_clear(self, ctx, target_date: str = None):
         """Remove all tasks for a date. Usage: !todo clear [date]"""
