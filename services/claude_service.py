@@ -110,6 +110,7 @@ Available actions:
 - set_reminder: parameters: {"raw_input": "the full reminder text for further parsing"}
 - check_context_reminders: parameters: {"context": "heading_out|morning|evening"}
 - list_reminders: parameters: {}
+- remove_reminder: parameters: {"reminder_id": <int>}
 - check_email: parameters: {}
 - check_mentions: parameters: {}
 - check_notifications: parameters: {}

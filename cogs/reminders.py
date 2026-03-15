@@ -22,8 +22,8 @@ class Reminders(commands.Cog):
             # Context-based reminder
             async with get_db() as db:
                 await db.execute(
-                    "INSERT INTO reminders (message, context) VALUES (?, ?)",
-                    (parsed["message"], parsed["context"]),
+                    "INSERT INTO reminders (message, context, user_id) VALUES (?, ?, ?)",
+                    (parsed["message"], parsed["context"], ctx.author.id),
                 )
                 await db.commit()
 
@@ -40,8 +40,8 @@ class Reminders(commands.Cog):
 
             async with get_db() as db:
                 cursor = await db.execute(
-                    "INSERT INTO reminders (message, remind_at) VALUES (?, ?)",
-                    (parsed["message"], parsed["remind_at"]),
+                    "INSERT INTO reminders (message, remind_at, user_id) VALUES (?, ?, ?)",
+                    (parsed["message"], parsed["remind_at"], ctx.author.id),
                 )
                 reminder_id = cursor.lastrowid
                 await db.commit()
@@ -51,7 +51,7 @@ class Reminders(commands.Cog):
                 _send_reminder,
                 "date",
                 run_date=remind_at,
-                args=[self.bot, channel_id, reminder_id, parsed["message"]],
+                args=[self.bot, channel_id, reminder_id, parsed["message"], ctx.author.id],
                 id=f"reminder_{reminder_id}",
             )
 
@@ -74,8 +74,8 @@ class Reminders(commands.Cog):
         """Set a context-based reminder. Usage: !remind before <context> <message>"""
         async with get_db() as db:
             await db.execute(
-                "INSERT INTO reminders (message, context) VALUES (?, ?)",
-                (message, context),
+                "INSERT INTO reminders (message, context, user_id) VALUES (?, ?, ?)",
+                (message, context, ctx.author.id),
             )
             await db.commit()
 
@@ -91,8 +91,8 @@ class Reminders(commands.Cog):
         """Set a morning context reminder. Usage: !remind morning <message>"""
         async with get_db() as db:
             await db.execute(
-                "INSERT INTO reminders (message, context) VALUES (?, ?)",
-                (message, "morning"),
+                "INSERT INTO reminders (message, context, user_id) VALUES (?, ?, ?)",
+                (message, "morning", ctx.author.id),
             )
             await db.commit()
 
@@ -100,6 +100,34 @@ class Reminders(commands.Cog):
             title="Reminder Set",
             description=f"**{message}**\nContext: `morning`",
             color=discord.Color.blue(),
+        )
+        await ctx.send(embed=embed)
+
+    @remind.command(name="remove")
+    async def remind_remove(self, ctx, reminder_id: int):
+        """Remove a reminder by ID. Usage: !remind remove <id>"""
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT id FROM reminders WHERE id = ? AND fired = 0",
+                (reminder_id,),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                await ctx.send(f"No active reminder found with ID #{reminder_id}.")
+                return
+
+            await db.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+            await db.commit()
+
+            # Remove scheduled job if it exists
+            job_id = f"reminder_{reminder_id}"
+            if scheduler.get_job(job_id):
+                scheduler.remove_job(job_id)
+
+        embed = discord.Embed(
+            title="Reminder Removed",
+            description=f"Reminder #{reminder_id} has been removed.",
+            color=discord.Color.orange(),
         )
         await ctx.send(embed=embed)
 
@@ -176,19 +204,23 @@ class Reminders(commands.Cog):
             await db.commit()
 
         lines = []
+        user_ids = set()
         for i, r in enumerate(reminders, 1):
             lines.append(f"{i}. {r['message']}")
+            if r.get("user_id"):
+                user_ids.add(r["user_id"])
 
+        pings = " ".join(f"<@{uid}>" for uid in user_ids)
         embed = discord.Embed(
             title=f"Reminders — {context}",
             description="\n".join(lines),
             color=discord.Color.green(),
         )
         embed.set_footer(text=f"{len(reminders)} reminder(s) fired")
-        await ctx.send(embed=embed)
+        await ctx.send(content=pings or None, embed=embed)
 
 
-async def _send_reminder(bot, channel_id: int, reminder_id: int, message: str):
+async def _send_reminder(bot, channel_id: int, reminder_id: int, message: str, user_id: int = None):
     """Callback for APScheduler to send a timed reminder."""
     channel = bot.get_channel(channel_id)
     if channel:
@@ -197,7 +229,8 @@ async def _send_reminder(bot, channel_id: int, reminder_id: int, message: str):
             description=message,
             color=discord.Color.red(),
         )
-        await channel.send(embed=embed)
+        ping = f"<@{user_id}>" if user_id else None
+        await channel.send(content=ping, embed=embed)
 
     async with get_db() as db:
         await db.execute("UPDATE reminders SET fired = 1 WHERE id = ?", (reminder_id,))
