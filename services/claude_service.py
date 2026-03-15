@@ -1,9 +1,15 @@
 import json
+import re
 from datetime import datetime
 
 import anthropic
 
 from config import ANTHROPIC_API_KEY
+
+
+def _strip_code_fences(text: str) -> str:
+    """Strip markdown code fences from LLM responses."""
+    return re.sub(r"^```(?:json)?\s*\n?|```\s*$", "", text.strip())
 
 client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -78,7 +84,7 @@ Reply with ONLY the JSON object, nothing else."""
         max_tokens=200,
         messages=[{"role": "user", "content": prompt}],
     )
-    return json.loads(message.content[0].text)
+    return json.loads(_strip_code_fences(message.content[0].text))
 
 
 async def route_command(user_message: str) -> dict:
@@ -126,7 +132,7 @@ Examples:
     )
 
     try:
-        return json.loads(message.content[0].text)
+        return json.loads(_strip_code_fences(message.content[0].text))
     except json.JSONDecodeError:
         return {
             "action": "general_chat",
