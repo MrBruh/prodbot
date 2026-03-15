@@ -40,6 +40,8 @@ def ctx():
     mock_ctx.channel.id = 12345
     mock_ctx.author = MagicMock()
     mock_ctx.author.id = 99999
+    mock_ctx.message = MagicMock()
+    mock_ctx.message.mentions = []
     return mock_ctx
 
 
@@ -238,8 +240,8 @@ class TestMissedReminders:
         past_time = (datetime.now() - timedelta(minutes=10)).isoformat()
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
-                "INSERT INTO reminders (message, remind_at, user_id) VALUES (?, ?, ?)",
-                ("Missed one", past_time, 99999),
+                "INSERT INTO reminders (message, remind_at, user_id, target_user_id, channel_id) VALUES (?, ?, ?, ?, ?)",
+                ("Missed one", past_time, 99999, 99999, 12345),
             )
             await db.commit()
 
@@ -248,7 +250,7 @@ class TestMissedReminders:
         bot.get_channel = MagicMock(return_value=mock_channel)
         bot.wait_until_ready = AsyncMock()
 
-        with _patch_get_db(db_path), patch("cogs.reminders.BOT_CHANNEL_ID", 12345):
+        with _patch_get_db(db_path):
             await cog._fire_missed_reminders()
 
         mock_channel.send.assert_called_once()
@@ -267,7 +269,7 @@ class TestMissedReminders:
         bot.wait_until_ready = AsyncMock()
         bot.get_channel = MagicMock()
 
-        with _patch_get_db(db_path), patch("cogs.reminders.BOT_CHANNEL_ID", 12345):
+        with _patch_get_db(db_path):
             await cog._fire_missed_reminders()
 
         bot.get_channel.assert_not_called()

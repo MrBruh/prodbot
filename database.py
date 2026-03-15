@@ -57,6 +57,8 @@ async def init_db():
                 recurring BOOLEAN DEFAULT 0,
                 fired BOOLEAN DEFAULT 0,
                 user_id INTEGER,
+                target_user_id INTEGER,
+                channel_id INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
