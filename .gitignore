@@ -7,7 +7,7 @@ bot.db
 jobs.db
 token.json
 credentials.json
-.claude/settings.local.json
+.claude/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/

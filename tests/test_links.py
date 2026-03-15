@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
+import anthropic
 import pytest
 import pytest_asyncio
 
@@ -75,7 +76,11 @@ class TestSaveLink:
         with _patch_get_db(db_path), patch(
             "cogs.links.summarize_url",
             new_callable=AsyncMock,
-            side_effect=Exception("API error"),
+            side_effect=anthropic.APIStatusError(
+                "API error",
+                response=MagicMock(status_code=500, headers={}),
+                body=None,
+            ),
         ):
             await cog.save_link.callback(cog, ctx, url="https://fail.com", tags="")
 

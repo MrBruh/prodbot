@@ -1,8 +1,13 @@
+import logging
+
+import anthropic
 import discord
 from discord.ext import commands
 
 from database import get_db
 from services.claude_service import summarize_url
+
+logger = logging.getLogger(__name__)
 
 
 class Links(commands.Cog):
@@ -14,7 +19,8 @@ class Links(commands.Cog):
         """Save a link with optional tags. Usage: !save <url> [tags]"""
         try:
             title = await summarize_url(url)
-        except Exception:
+        except anthropic.APIError as e:
+            logger.warning(f"Failed to summarize URL: {e}")
             title = None
 
         async with get_db() as db:

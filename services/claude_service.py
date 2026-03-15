@@ -2,12 +2,12 @@ import anthropic
 
 from config import ANTHROPIC_API_KEY
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
 
 async def summarize_url(url: str) -> str:
     """Ask Claude to generate a short title/summary for a URL."""
-    message = client.messages.create(
+    message = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=100,
         messages=[
@@ -35,7 +35,7 @@ Journal entries:
 
 Write a brief, encouraging reflection (2-3 sentences) about their day. Note what they accomplished and gently suggest what they might follow up on tomorrow."""
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
