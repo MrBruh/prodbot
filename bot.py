@@ -58,6 +58,16 @@ async def on_message(message):
         cmd = bot.get_command("todo add")
         if cmd:
             await ctx.invoke(cmd, task=params.get("task", ""))
+    elif action == "add_todos":
+        cmd = bot.get_command("todo add")
+        if cmd:
+            for task in params.get("tasks", []):
+                await ctx.invoke(cmd, task=task)
+    elif action == "clear_todos":
+        cmd = bot.get_command("todo clear")
+        if cmd:
+            date_param = params.get("date", "today")
+            await ctx.invoke(cmd, target_date=date_param if date_param != "today" else None)
     elif action == "list_todos":
         date_param = params.get("date", "today")
         if date_param == "today":
@@ -148,6 +158,10 @@ async def on_message(message):
         cmd = bot.get_command("remind remove")
         if cmd:
             await ctx.invoke(cmd, reminder_id=params.get("reminder_id"))
+    elif action == "clear_reminders":
+        cmd = bot.get_command("remind clear")
+        if cmd:
+            await ctx.invoke(cmd)
     else:
         await message.channel.send(response_text)
 

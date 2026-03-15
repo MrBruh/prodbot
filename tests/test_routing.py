@@ -134,7 +134,7 @@ async def test_route_command_sends_system_prompt(mock_client):
     assert "Available actions" in call_kwargs.kwargs["system"]
     assert "add_todo" in call_kwargs.kwargs["system"]
     assert call_kwargs.kwargs["model"] == "claude-haiku-4-5-20251001"
-    assert call_kwargs.kwargs["max_tokens"] == 300
+    assert call_kwargs.kwargs["max_tokens"] == 500
 
 
 @pytest.mark.asyncio
