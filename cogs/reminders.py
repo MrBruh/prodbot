@@ -234,17 +234,25 @@ class Reminders(commands.Cog):
 
     @commands.command(name="reminders")
     async def list_reminders(self, ctx):
-        """List all active (unfired) reminders. Usage: !reminders"""
+        """List active reminders. Usage: !reminders [@user]"""
+        mentioned = ctx.message.mentions[0] if ctx.message.mentions else None
         async with get_db() as db:
             db.row_factory = _dict_factory
-            cursor = await db.execute(
-                "SELECT * FROM reminders WHERE fired = 0 ORDER BY id",
-            )
+            if mentioned:
+                cursor = await db.execute(
+                    "SELECT * FROM reminders WHERE fired = 0 AND (target_user_id = ? OR user_id = ?) ORDER BY id",
+                    (mentioned.id, mentioned.id),
+                )
+            else:
+                cursor = await db.execute(
+                    "SELECT * FROM reminders WHERE fired = 0 ORDER BY id",
+                )
             reminders = await cursor.fetchall()
 
+        title_suffix = f" for {mentioned.display_name}" if mentioned else ""
         if not reminders:
             embed = discord.Embed(
-                title="Reminders",
+                title=f"Reminders{title_suffix}",
                 description="No active reminders.",
                 color=discord.Color.light_grey(),
             )
@@ -262,7 +270,7 @@ class Reminders(commands.Cog):
                 lines.append(f"{i}. {r['message']}{target} (#{r['id']})")
 
         embed = discord.Embed(
-            title="Active Reminders",
+            title=f"Active Reminders{title_suffix}",
             description="\n".join(lines),
             color=discord.Color.blue(),
         )

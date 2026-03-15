@@ -68,7 +68,7 @@ class Help(commands.Cog):
                 "`!remind remove <id>` — Remove a reminder by ID\n"
                 "`!remind clear` — Remove all active reminders\n"
                 "`!heading out` / `!leaving` — Show heading-out reminders\n"
-                "`!reminders` — List all active reminders"
+                "`!reminders [@user]` — List active reminders (optionally for a user)"
             ),
             inline=False,
         )
