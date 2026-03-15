@@ -20,6 +20,7 @@ async def on_ready():
 
 async def main():
     async with bot:
+        await bot.load_extension("cogs.help")
         await bot.load_extension("cogs.links")
         await bot.load_extension("cogs.todos")
         await bot.load_extension("cogs.bucket_list")
