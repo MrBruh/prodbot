@@ -3,10 +3,10 @@
 # Customize the paths below for your environment
 
 # === CUSTOMIZE THESE ===
-DEPLOY_DIR="/home/deploy/discord-life-bot"
+DEPLOY_DIR="/home/deploy/prodbot"
 VENV_DIR="$DEPLOY_DIR/venv"
-SERVICE_NAME="discord-life-bot"
-LOG_FILE="/var/log/discord-life-bot/deploy.log"
+SERVICE_NAME="prodbot"
+LOG_FILE="/var/log/prodbot/deploy.log"
 # ========================
 
 log() {

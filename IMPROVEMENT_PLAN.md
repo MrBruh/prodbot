@@ -1,4 +1,4 @@
-# Discord Life Bot - Improvement Plan
+# Prodbot - Improvement Plan
 
 This document outlines recommended changes to reduce technical debt and improve project maintainability.
 
@@ -90,7 +90,7 @@ Create modern Python project configuration with:
 **Template:**
 ```toml
 [project]
-name = "discord-life-bot"
+name = "prodbot"
 version = "0.1.0"
 requires-python = ">=3.10"
 

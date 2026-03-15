@@ -1,13 +1,13 @@
 [Unit]
-Description=Discord Life Bot
+Description=Prodbot
 After=network.target
 
 [Service]
 # === CUSTOMIZE THESE ===
 User=deploy
-WorkingDirectory=/home/deploy/discord-life-bot
-ExecStart=/home/deploy/discord-life-bot/venv/bin/python bot.py
-EnvironmentFile=/home/deploy/discord-life-bot/.env
+WorkingDirectory=/home/deploy/prodbot
+ExecStart=/home/deploy/prodbot/venv/bin/python bot.py
+EnvironmentFile=/home/deploy/prodbot/.env
 # ========================
 
 Restart=on-failure
@@ -16,7 +16,7 @@ RestartSec=10
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/home/deploy/discord-life-bot
+ReadWritePaths=/home/deploy/prodbot
 
 [Install]
 WantedBy=multi-user.target
