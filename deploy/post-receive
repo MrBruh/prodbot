@@ -19,6 +19,7 @@ while read oldrev newrev ref; do
 
         log "Pulling latest code..."
         cd "$DEPLOY_DIR" || { log "ERROR: Could not cd to $DEPLOY_DIR"; exit 1; }
+        unset GIT_DIR
         git fetch origin master
         git reset --hard origin/master
 
