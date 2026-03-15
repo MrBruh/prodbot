@@ -47,12 +47,13 @@ async def on_message(message):
 
     action = result.get("action", "general_chat")
     params = result.get("parameters", {})
+    response_text = result.get("response", "I'm not sure what you mean.")
 
     # Create a context for invoking commands
     ctx = await bot.get_context(message)
 
     if action == "general_chat":
-        await message.channel.send(result.get("response", "I'm not sure what you mean."))
+        await message.channel.send(response_text)
     elif action == "add_todo":
         cmd = bot.get_command("todo add")
         if cmd:
@@ -143,6 +144,8 @@ async def on_message(message):
         cmd = bot.get_command("reminders")
         if cmd:
             await ctx.invoke(cmd)
+    else:
+        await message.channel.send(response_text)
 
 
 async def main():
