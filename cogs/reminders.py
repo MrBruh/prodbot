@@ -1,17 +1,60 @@
+import logging
 from datetime import datetime
 
 import discord
 from discord.ext import commands
 
+from config import BOT_CHANNEL_ID
 from database import get_db
 from services.claude_service import parse_reminder_time
 from services.scheduler_service import scheduler, start_scheduler
+
+logger = logging.getLogger(__name__)
 
 
 class Reminders(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         start_scheduler()
+
+    async def cog_load(self):
+        """Check for missed timed reminders on startup."""
+        self.bot.loop.create_task(self._fire_missed_reminders())
+
+    async def _fire_missed_reminders(self):
+        """Send and delete any timed reminders that were missed while offline."""
+        await self.bot.wait_until_ready()
+        now = datetime.now().isoformat()
+        async with get_db() as db:
+            db.row_factory = _dict_factory
+            cursor = await db.execute(
+                "SELECT * FROM reminders WHERE remind_at IS NOT NULL AND remind_at <= ? AND fired = 0",
+                (now,),
+            )
+            missed = await cursor.fetchall()
+
+            if not missed:
+                return
+
+            # Delete them
+            ids = [r["id"] for r in missed]
+            placeholders = ",".join("?" * len(ids))
+            await db.execute(f"DELETE FROM reminders WHERE id IN ({placeholders})", ids)
+            await db.commit()
+
+        channel = self.bot.get_channel(BOT_CHANNEL_ID)
+        if not channel:
+            logger.warning("Could not find bot channel to send missed reminders")
+            return
+
+        for r in missed:
+            embed = discord.Embed(
+                title="Missed Reminder",
+                description=f"**{r['message']}**\nWas scheduled for: {r['remind_at']}",
+                color=discord.Color.red(),
+            )
+            ping = f"<@{r['user_id']}>" if r.get("user_id") else None
+            await channel.send(content=ping, embed=embed)
 
     @commands.group(name="remind", invoke_without_command=True)
     async def remind(self, ctx, *, text: str):
@@ -107,8 +150,9 @@ class Reminders(commands.Cog):
     async def remind_remove(self, ctx, reminder_id: int):
         """Remove a reminder by ID. Usage: !remind remove <id>"""
         async with get_db() as db:
+            db.row_factory = _dict_factory
             cursor = await db.execute(
-                "SELECT id FROM reminders WHERE id = ? AND fired = 0",
+                "SELECT * FROM reminders WHERE id = ? AND fired = 0",
                 (reminder_id,),
             )
             row = await cursor.fetchone()
@@ -124,9 +168,15 @@ class Reminders(commands.Cog):
             if scheduler.get_job(job_id):
                 scheduler.remove_job(job_id)
 
+        details = f"**{row['message']}**"
+        if row.get("remind_at"):
+            details += f"\nTime: {row['remind_at']}"
+        elif row.get("context"):
+            details += f"\nContext: `{row['context']}`"
+
         embed = discord.Embed(
             title="Reminder Removed",
-            description=f"Reminder #{reminder_id} has been removed.",
+            description=details,
             color=discord.Color.orange(),
         )
         await ctx.send(embed=embed)
@@ -196,9 +246,9 @@ class Reminders(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Mark all as fired
+            # Delete fired reminders
             await db.execute(
-                "UPDATE reminders SET fired = 1 WHERE context = ? AND fired = 0",
+                "DELETE FROM reminders WHERE context = ? AND fired = 0",
                 (context,),
             )
             await db.commit()
@@ -233,7 +283,7 @@ async def _send_reminder(bot, channel_id: int, reminder_id: int, message: str, u
         await channel.send(content=ping, embed=embed)
 
     async with get_db() as db:
-        await db.execute("UPDATE reminders SET fired = 1 WHERE id = ?", (reminder_id,))
+        await db.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
         await db.commit()
 
 
