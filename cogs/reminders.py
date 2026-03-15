@@ -181,6 +181,29 @@ class Reminders(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    @remind.command(name="clear")
+    async def remind_clear(self, ctx):
+        """Remove all active reminders. Usage: !remind clear"""
+        async with get_db() as db:
+            cursor = await db.execute("DELETE FROM reminders WHERE fired = 0")
+            await db.commit()
+            count = cursor.rowcount
+
+        # Cancel all scheduled jobs
+        for job in scheduler.get_jobs():
+            if job.id.startswith("reminder_"):
+                job.remove()
+
+        if count == 0:
+            await ctx.send("No active reminders to clear.")
+        else:
+            embed = discord.Embed(
+                title="Reminders Cleared",
+                description=f"Removed {count} reminder(s).",
+                color=discord.Color.orange(),
+            )
+            await ctx.send(embed=embed)
+
     @commands.command(name="heading")
     async def heading_out(self, ctx, *, _rest: str = "out"):
         """Trigger heading_out reminders. Usage: !heading out"""

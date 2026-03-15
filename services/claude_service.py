@@ -98,9 +98,11 @@ async def route_command(user_message: str) -> dict:
 }
 
 Available actions:
-- add_todo: parameters: {"task": "..."}
+- add_todo: parameters: {"task": "..."} (single task)
+- add_todos: parameters: {"tasks": ["task1", "task2", ...]} (multiple tasks)
 - list_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
 - complete_todo: parameters: {"task_id": <int>}
+- clear_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
 - save_link: parameters: {"url": "...", "tags": "..."}
 - list_links: parameters: {"filter": "unread|read|all"}
 - add_goal: parameters: {"goal": "...", "category": "general"}
@@ -111,6 +113,7 @@ Available actions:
 - check_context_reminders: parameters: {"context": "heading_out|morning|evening"}
 - list_reminders: parameters: {}
 - remove_reminder: parameters: {"reminder_id": <int>}
+- clear_reminders: parameters: {}
 - check_email: parameters: {}
 - check_mentions: parameters: {}
 - check_notifications: parameters: {}
@@ -123,11 +126,14 @@ Examples:
 - "save this link https://example.com" → {"action": "save_link", "parameters": {"url": "https://example.com", "tags": ""}}
 - "how's my day going?" → {"action": "reflect", "parameters": {}}
 - "any new emails?" → {"action": "check_email", "parameters": {}}
-- "hello!" → {"action": "general_chat", "parameters": {}, "response": "Hey there! How can I help you today?"}"""
+- "hello!" → {"action": "general_chat", "parameters": {}, "response": "Hey there! How can I help you today?"}
+- "add these tasks: 1. Buy groceries 2. Clean house" → {"action": "add_todos", "parameters": {"tasks": ["Buy groceries", "Clean house"]}}
+- "remove all todos for today" → {"action": "clear_todos", "parameters": {"date": "today"}}
+- "remove all reminders" → {"action": "clear_reminders", "parameters": {}}"""
 
     message = await client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=300,
+        max_tokens=500,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )

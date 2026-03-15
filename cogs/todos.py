@@ -40,6 +40,19 @@ class Todos(commands.Cog):
         """View tasks for a specific date. Usage: !todo date 2025-03-20"""
         await self._show_tasks(ctx, target_date)
 
+    @todo.command(name="clear")
+    async def todo_clear(self, ctx, target_date: str = None):
+        """Remove all tasks for a date. Usage: !todo clear [date]"""
+        target_date = target_date or str(date.today())
+        async with get_db() as db:
+            cursor = await db.execute("DELETE FROM todos WHERE date = ?", (target_date,))
+            await db.commit()
+            count = cursor.rowcount
+        if count == 0:
+            await ctx.send(f"No tasks to clear for {target_date}.")
+        else:
+            await ctx.send(f"Cleared {count} task(s) for {target_date}.")
+
     @commands.command(name="today")
     async def today(self, ctx):
         """Alias for !todo — show today's tasks."""
