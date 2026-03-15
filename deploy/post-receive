@@ -1,0 +1,35 @@
+#!/bin/bash
+# post-receive hook — place in your bare repo's hooks/ directory
+# Customize the paths below for your environment
+
+# === CUSTOMIZE THESE ===
+DEPLOY_DIR="/home/deploy/discord-life-bot"
+VENV_DIR="$DEPLOY_DIR/venv"
+SERVICE_NAME="discord-life-bot"
+LOG_FILE="/var/log/discord-life-bot/deploy.log"
+# ========================
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+while read oldrev newrev ref; do
+    if [ "$ref" = "refs/heads/master" ]; then
+        log "Deploy triggered by push to master ($oldrev -> $newrev)"
+
+        log "Pulling latest code..."
+        cd "$DEPLOY_DIR" || { log "ERROR: Could not cd to $DEPLOY_DIR"; exit 1; }
+        git fetch origin master
+        git reset --hard origin/master
+
+        log "Installing dependencies..."
+        "$VENV_DIR/bin/pip" install -r requirements.txt --quiet
+
+        log "Restarting service..."
+        sudo systemctl restart "$SERVICE_NAME"
+
+        log "Deploy complete."
+    else
+        echo "Push to $ref — skipping deploy (only master triggers deploy)."
+    fi
+done
