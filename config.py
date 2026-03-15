@@ -16,4 +16,4 @@ def _get_required_env(name: str) -> str:
 
 DISCORD_TOKEN: str = _get_required_env("DISCORD_TOKEN")
 ANTHROPIC_API_KEY: str = _get_required_env("ANTHROPIC_API_KEY")
-BOT_CHANNEL_ID: int = int(_get_required_env("BOT_CHANNEL_ID"))
+BOT_CHANNEL_NAME: str = os.getenv("BOT_CHANNEL_NAME", "prodbot")

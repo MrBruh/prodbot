@@ -4,7 +4,7 @@ import logging
 import discord
 from discord.ext import commands
 
-from config import BOT_CHANNEL_ID, DISCORD_TOKEN
+from config import BOT_CHANNEL_NAME, DISCORD_TOKEN
 from database import init_db
 from services.claude_service import route_command
 
@@ -36,7 +36,7 @@ async def on_message(message):
         return
     if message.content.startswith("!"):
         return
-    if message.channel.id != BOT_CHANNEL_ID:
+    if getattr(message.channel, "name", None) != BOT_CHANNEL_NAME:
         return
 
     try:
@@ -80,6 +80,10 @@ async def on_message(message):
                 await ctx.invoke(cmd, target_date=date_param)
     elif action == "complete_todo":
         cmd = bot.get_command("todo done")
+        if cmd:
+            await ctx.invoke(cmd, task_id=params.get("task_id"))
+    elif action == "remove_todo":
+        cmd = bot.get_command("todo remove")
         if cmd:
             await ctx.invoke(cmd, task_id=params.get("task_id"))
     elif action == "save_link":

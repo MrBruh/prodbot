@@ -31,6 +31,7 @@ class Help(commands.Cog):
                 "`!todo add <task>` — Add a task for today\n"
                 "`!todo` / `!today` — Show today's tasks\n"
                 "`!todo done <id>` — Mark a task complete\n"
+                "`!todo remove <id>` — Remove a task\n"
                 "`!todo clear [date]` — Remove all tasks for a date\n"
                 "`!todo date <YYYY-MM-DD>` — View tasks for a date"
             ),
@@ -61,9 +62,9 @@ class Help(commands.Cog):
         embed.add_field(
             name="Reminders",
             value=(
-                "`!remind at <time> <message>` — Set a timed reminder\n"
-                "`!remind before <context> <message>` — Set a context reminder\n"
-                "`!remind morning <message>` — Remind at morning context\n"
+                "`!remind at <time> [@user] <message>` — Set a timed reminder\n"
+                "`!remind before <context> [@user] <message>` — Set a context reminder\n"
+                "`!remind morning [@user] <message>` — Remind at morning context\n"
                 "`!remind remove <id>` — Remove a reminder by ID\n"
                 "`!remind clear` — Remove all active reminders\n"
                 "`!heading out` / `!leaving` — Show heading-out reminders\n"
