@@ -63,6 +63,7 @@ class Help(commands.Cog):
                 "`!remind at <time> <message>` — Set a timed reminder\n"
                 "`!remind before <context> <message>` — Set a context reminder\n"
                 "`!remind morning <message>` — Remind at morning context\n"
+                "`!remind remove <id>` — Remove a reminder by ID\n"
                 "`!heading out` / `!leaving` — Show heading-out reminders\n"
                 "`!reminders` — List all active reminders"
             ),

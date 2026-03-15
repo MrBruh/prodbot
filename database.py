@@ -56,6 +56,7 @@ async def init_db():
                 context TEXT,
                 recurring BOOLEAN DEFAULT 0,
                 fired BOOLEAN DEFAULT 0,
+                user_id INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)

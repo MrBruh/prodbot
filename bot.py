@@ -144,6 +144,10 @@ async def on_message(message):
         cmd = bot.get_command("reminders")
         if cmd:
             await ctx.invoke(cmd)
+    elif action == "remove_reminder":
+        cmd = bot.get_command("remind remove")
+        if cmd:
+            await ctx.invoke(cmd, reminder_id=params.get("reminder_id"))
     else:
         await message.channel.send(response_text)
 

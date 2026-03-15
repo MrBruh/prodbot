@@ -37,6 +37,8 @@ def ctx():
     mock_ctx.send = AsyncMock()
     mock_ctx.channel = MagicMock()
     mock_ctx.channel.id = 12345
+    mock_ctx.author = MagicMock()
+    mock_ctx.author.id = 99999
     return mock_ctx
 
 
