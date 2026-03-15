@@ -1,5 +1,6 @@
 """Tests for the Reminders cog."""
 
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
@@ -153,13 +154,12 @@ class TestHeadingOut:
         assert "Grab package" in embed.description
         assert "Take umbrella" in embed.description
 
-        # Verify they are marked as fired
+        # Verify they are deleted
         async with aiosqlite.connect(db_path) as db:
-            db.row_factory = _dict_factory
-            cur = await db.execute("SELECT * FROM reminders WHERE fired = 0")
-            unfired = await cur.fetchall()
+            cur = await db.execute("SELECT COUNT(*) FROM reminders")
+            count = (await cur.fetchone())[0]
 
-        assert len(unfired) == 0
+        assert count == 0
 
     @pytest.mark.asyncio
     async def test_heading_out_no_reminders(self, cog, ctx, db_path):
@@ -227,3 +227,47 @@ class TestRemindMorning:
         embed = ctx.send.call_args[1]["embed"]
         assert "Take vitamins" in embed.description
         assert "morning" in embed.description
+
+
+# ── missed reminders on startup ───────────────────────────────────────────
+
+
+class TestMissedReminders:
+    @pytest.mark.asyncio
+    async def test_fires_missed_reminders_on_startup(self, cog, bot, db_path):
+        past_time = (datetime.now() - timedelta(minutes=10)).isoformat()
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "INSERT INTO reminders (message, remind_at, user_id) VALUES (?, ?, ?)",
+                ("Missed one", past_time, 99999),
+            )
+            await db.commit()
+
+        mock_channel = MagicMock()
+        mock_channel.send = AsyncMock()
+        bot.get_channel = MagicMock(return_value=mock_channel)
+        bot.wait_until_ready = AsyncMock()
+
+        with _patch_get_db(db_path), patch("cogs.reminders.BOT_CHANNEL_ID", 12345):
+            await cog._fire_missed_reminders()
+
+        mock_channel.send.assert_called_once()
+        embed = mock_channel.send.call_args[1]["embed"]
+        assert "Missed one" in embed.description
+        assert mock_channel.send.call_args[1]["content"] == "<@99999>"
+
+        # Verify deleted from DB
+        async with aiosqlite.connect(db_path) as db:
+            cur = await db.execute("SELECT COUNT(*) FROM reminders")
+            count = (await cur.fetchone())[0]
+        assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_no_missed_reminders(self, cog, bot, db_path):
+        bot.wait_until_ready = AsyncMock()
+        bot.get_channel = MagicMock()
+
+        with _patch_get_db(db_path), patch("cogs.reminders.BOT_CHANNEL_ID", 12345):
+            await cog._fire_missed_reminders()
+
+        bot.get_channel.assert_not_called()
