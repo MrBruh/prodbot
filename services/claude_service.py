@@ -1,3 +1,6 @@
+import json
+from datetime import datetime
+
 import anthropic
 
 from config import ANTHROPIC_API_KEY
@@ -41,3 +44,92 @@ Write a brief, encouraging reflection (2-3 sentences) about their day. Note what
         messages=[{"role": "user", "content": prompt}],
     )
     return message.content[0].text
+
+
+async def parse_reminder_time(text: str) -> dict:
+    """Use Claude to parse natural language time expressions into structured data.
+
+    Returns a dict with:
+        remind_at: ISO datetime string or None (for timed reminders)
+        context: context name or None (for context-based reminders)
+        message: the reminder message
+    """
+    now = datetime.now().isoformat()
+
+    prompt = f"""Parse this reminder request and return JSON only. Current time: {now}
+
+Input: "{text}"
+
+Return a JSON object with exactly these keys:
+- "remind_at": ISO datetime string if this is a timed reminder, or null if context-based
+- "context": context name (e.g. "heading_out", "morning") if context-based, or null if timed
+- "message": the reminder message text (without the time/context part)
+
+Examples:
+- "at 9pm Call Sarah" -> {{"remind_at": "2026-03-15T21:00:00", "context": null, "message": "Call Sarah"}}
+- "in 2 hours check email" -> {{"remind_at": "2026-03-15T16:00:00", "context": null, "message": "check email"}}
+- "before heading_out Bring package" -> {{"remind_at": null, "context": "heading_out", "message": "Bring package"}}
+- "morning Take vitamins" -> {{"remind_at": null, "context": "morning", "message": "Take vitamins"}}
+
+Reply with ONLY the JSON object, nothing else."""
+
+    message = await client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=200,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return json.loads(message.content[0].text)
+
+
+async def route_command(user_message: str) -> dict:
+    """Use Claude to determine user intent from natural language and return structured action."""
+    system_prompt = """You are a productivity assistant Discord bot. Given the user's message, determine what action to take. Respond with JSON only, no other text.
+
+{
+  "action": "<action_name>",
+  "parameters": { ... },
+  "response": "<friendly response if action is general_chat>"
+}
+
+Available actions:
+- add_todo: parameters: {"task": "..."}
+- list_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
+- complete_todo: parameters: {"task_id": <int>}
+- save_link: parameters: {"url": "...", "tags": "..."}
+- list_links: parameters: {"filter": "unread|read|all"}
+- add_goal: parameters: {"goal": "...", "category": "general"}
+- list_goals: parameters: {}
+- log_journal: parameters: {"entry": "..."}
+- reflect: parameters: {}
+- set_reminder: parameters: {"raw_input": "the full reminder text for further parsing"}
+- check_context_reminders: parameters: {"context": "heading_out|morning|evening"}
+- list_reminders: parameters: {}
+- check_email: parameters: {}
+- check_mentions: parameters: {}
+- check_notifications: parameters: {}
+- general_chat: parameters: {}, response: "your conversational reply"
+
+Examples:
+- "remind me at 9pm to call Sarah" → {"action": "set_reminder", "parameters": {"raw_input": "at 9pm call Sarah"}}
+- "I'm heading out now" → {"action": "check_context_reminders", "parameters": {"context": "heading_out"}}
+- "what do I need to do today?" → {"action": "list_todos", "parameters": {"date": "today"}}
+- "save this link https://example.com" → {"action": "save_link", "parameters": {"url": "https://example.com", "tags": ""}}
+- "how's my day going?" → {"action": "reflect", "parameters": {}}
+- "any new emails?" → {"action": "check_email", "parameters": {}}
+- "hello!" → {"action": "general_chat", "parameters": {}, "response": "Hey there! How can I help you today?"}"""
+
+    message = await client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=300,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    try:
+        return json.loads(message.content[0].text)
+    except json.JSONDecodeError:
+        return {
+            "action": "general_chat",
+            "parameters": {},
+            "response": message.content[0].text,
+        }

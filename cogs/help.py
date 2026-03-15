@@ -57,6 +57,30 @@ class Help(commands.Cog):
             inline=False,
         )
 
+        embed.add_field(
+            name="Reminders",
+            value=(
+                "`!remind at <time> <message>` — Set a timed reminder\n"
+                "`!remind before <context> <message>` — Set a context reminder\n"
+                "`!remind morning <message>` — Remind at morning context\n"
+                "`!heading out` / `!leaving` — Show heading-out reminders\n"
+                "`!reminders` — List all active reminders"
+            ),
+            inline=False,
+        )
+
+        embed.add_field(
+            name="Notifications",
+            value=(
+                "`!email check` — Show unread emails\n"
+                "`!mentions` — Check recent Discord mentions\n"
+                "`!notifications` — Combined email + mentions"
+            ),
+            inline=False,
+        )
+
+        embed.set_footer(text="Or just type naturally — Claude will figure out the intent!")
+
         await ctx.send(embed=embed)
 
 
