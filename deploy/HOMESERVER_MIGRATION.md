@@ -78,19 +78,16 @@ End state: pushing to `master` triggers a deploy automatically; bot runs as an u
 
 ## Configuration
 
-6. [Complete: Y] **Make DB paths configurable via env vars.**
-   Currently `database.py:3` hardcodes `DB_PATH = "bot.db"` and the APScheduler URL is similarly hardcoded. Change both to read from env, defaulting to the current values for local dev:
+6. [Complete: Y] **Make the DB path configurable via env var.**
+   `database.py:3` hardcodes `DB_PATH = "bot.db"`. Change it to read from env, defaulting to the current value for local dev:
    ```python
    # database.py
    import os
    DB_PATH = os.getenv("DATABASE_PATH", "bot.db")
    ```
-   ```python
-   # services/scheduler_service.py
-   import os
-   JOBS_URL = os.getenv("JOBS_DATABASE_URL", "sqlite:///jobs.db")
-   ```
-   Commit these changes before the first deploy so the production env vars (step 7) actually take effect.
+   Commit this before the first deploy so the production env var (step 7) actually takes effect.
+
+   **APScheduler is in-memory (no `jobs.db`)** as of `1f6a9e3` — no SQLAlchemy jobstore to point. `services/scheduler_service.py` needs no change. The trade-off: scheduled reminders are lost on restart, but `cogs/reminders.py:cog_load` reschedules future reminders from the SQLite `reminders` table on startup, so persistence is preserved through the bot DB rather than the scheduler's own store.
 
 7. [Complete: Y] **Configure secrets file.**
    Portfolio step 8 pattern, root-owned mode 600, loaded by systemd via `EnvironmentFile=`:
@@ -100,12 +97,10 @@ End state: pushing to `master` triggers a deploy automatically; bot runs as an u
    ANTHROPIC_API_KEY=<rotated value from step 0>
    BOT_CHANNEL_ID=1482618260061950113
    DATABASE_PATH=/var/lib/prodbot/bot.db
-   JOBS_DATABASE_URL=sqlite:////var/lib/prodbot/jobs.db
    GOOGLE_CREDENTIALS_PATH=/srv/prodbot/credentials.json
    EOF
    sudo chmod 600 /etc/prodbot.env
    ```
-   Note the four slashes in `sqlite:////var/...` — three for the URL scheme, one for the absolute path's leading `/`.
 
 8. [Complete: N] **(Skippable) Place Google OAuth credentials.**
    This step is only needed if Gmail integration is actually working on the GCE VM today. To check:
@@ -192,6 +187,8 @@ End state: pushing to `master` triggers a deploy automatically; bot runs as an u
     sudo journalctl -u prodbot -f   # confirm Discord login + slash command sync
     ```
     If startup fails on `ProtectSystem=strict`, the bot is trying to write somewhere outside `ReadWritePaths=`. Fix the path, don't widen the rule.
+
+    **Service file updates are manual.** `deploy.sh` (step 14) only pulls code and restarts — it doesn't reinstall the unit file (would require extra NOPASSWD entries for `cp` to `/etc/systemd/system/` and `daemon-reload`). When you edit `deploy/prodbot.service` in the repo and pull on the server, re-run the three-command sequence above (`cp` + `daemon-reload` + `restart`) to pick up the change. Infrequent operation — service file rarely changes once configured.
 
 12. [Complete: N] **NOPASSWD sudoers for service restart.**
     Required so the deploy script (step 14) can restart the service non-interactively:
