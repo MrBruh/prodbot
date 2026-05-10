@@ -3,12 +3,10 @@ Description=Prodbot
 After=network.target
 
 [Service]
-# === CUSTOMIZE THESE ===
-User=deploy
-WorkingDirectory=/home/deploy/prodbot
-ExecStart=/home/deploy/prodbot/venv/bin/python bot.py
-EnvironmentFile=/home/deploy/prodbot/.env
-# ========================
+User=prodbot
+WorkingDirectory=/srv/prodbot
+ExecStart=/srv/prodbot/venv/bin/python bot.py
+EnvironmentFile=/etc/prodbot.env
 
 Restart=on-failure
 RestartSec=10
@@ -16,7 +14,7 @@ RestartSec=10
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/home/deploy/prodbot
+ReadWritePaths=/var/lib/prodbot
 
 [Install]
 WantedBy=multi-user.target
