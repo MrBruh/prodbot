@@ -251,7 +251,7 @@ class TestMissedReminders:
         bot.wait_until_ready = AsyncMock()
 
         with _patch_get_db(db_path):
-            await cog._fire_missed_reminders()
+            await cog._reschedule_reminders()
 
         mock_channel.send.assert_called_once()
         embed = mock_channel.send.call_args[1]["embed"]
@@ -270,6 +270,6 @@ class TestMissedReminders:
         bot.get_channel = MagicMock()
 
         with _patch_get_db(db_path):
-            await cog._fire_missed_reminders()
+            await cog._reschedule_reminders()
 
         bot.get_channel.assert_not_called()

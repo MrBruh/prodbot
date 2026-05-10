@@ -19,14 +19,35 @@ class Reminders(commands.Cog):
 
     async def cog_load(self):
         """Check for missed timed reminders on startup."""
-        self.bot.loop.create_task(self._fire_missed_reminders())
+        self.bot.loop.create_task(self._reschedule_reminders())
 
-    async def _fire_missed_reminders(self):
-        """Send and delete any timed reminders that were missed while offline."""
+    async def _reschedule_reminders(self):
+        """Reschedule future timed reminders into the in-memory scheduler on startup."""
         await self.bot.wait_until_ready()
         now = datetime.now().isoformat()
         async with get_db() as db:
             db.row_factory = _dict_factory
+            # Reschedule future reminders
+            cursor = await db.execute(
+                "SELECT * FROM reminders WHERE remind_at IS NOT NULL AND remind_at > ? AND fired = 0",
+                (now,),
+            )
+            future = await cursor.fetchall()
+
+            for r in future:
+                remind_at = datetime.fromisoformat(r["remind_at"])
+                scheduler.add_job(
+                    _send_reminder,
+                    "date",
+                    run_date=remind_at,
+                    args=[self.bot, r["channel_id"], r["id"], r["message"], r.get("target_user_id")],
+                    id=f"reminder_{r['id']}",
+                )
+
+            if future:
+                logger.info("Rescheduled %d future reminder(s)", len(future))
+
+            # Fire missed reminders (past-due)
             cursor = await db.execute(
                 "SELECT * FROM reminders WHERE remind_at IS NOT NULL AND remind_at <= ? AND fired = 0",
                 (now,),
