@@ -68,13 +68,14 @@ Input: "{text}"
 
 Return a JSON object with exactly these keys:
 - "remind_at": ISO datetime string if this is a timed reminder, or null if context-based
-- "context": context name (e.g. "heading_out", "morning") if context-based, or null if timed
+- "context": MUST be one of these exact values if context-based: "heading_out", "morning", "evening" — or null if timed. Any mention of heading out, leaving, heading home etc. should map to "heading_out".
 - "message": the reminder message text (without the time/context part)
 
 Examples:
 - "at 9pm Call Sarah" -> {{"remind_at": "2026-03-15T21:00:00", "context": null, "message": "Call Sarah"}}
 - "in 2 hours check email" -> {{"remind_at": "2026-03-15T16:00:00", "context": null, "message": "check email"}}
-- "before heading_out Bring package" -> {{"remind_at": null, "context": "heading_out", "message": "Bring package"}}
+- "before heading out Bring package" -> {{"remind_at": null, "context": "heading_out", "message": "Bring package"}}
+- "before I leave grab keys" -> {{"remind_at": null, "context": "heading_out", "message": "grab keys"}}
 - "morning Take vitamins" -> {{"remind_at": null, "context": "morning", "message": "Take vitamins"}}
 
 Reply with ONLY the JSON object, nothing else."""

@@ -1,6 +1,8 @@
+import os
+
 import aiosqlite
 
-DB_PATH = "bot.db"
+DB_PATH = os.getenv("DATABASE_PATH", "bot.db")
 
 
 def get_db():
