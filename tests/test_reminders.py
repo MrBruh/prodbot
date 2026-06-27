@@ -52,6 +52,77 @@ def _patch_get_db(db_path):
     return patch("cogs.reminders.get_db", new_callable=MagicMock, side_effect=fake_get_db)
 
 
+# ── create_reminder (shared helper) ────────────────────────────────────────
+
+
+class TestCreateReminder:
+    @pytest.mark.asyncio
+    async def test_timed_inserts_and_schedules(self, cog, ctx, db_path):
+        with _patch_get_db(db_path), patch("cogs.reminders.scheduler") as mock_scheduler:
+            created = await cog.create_reminder(
+                ctx, message="Call Sarah", remind_at="2026-06-30T21:00:00"
+            )
+
+        assert created is True
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = _dict_factory
+            row = await (await db.execute("SELECT * FROM reminders WHERE id = 1")).fetchone()
+
+        assert row["message"] == "Call Sarah"
+        assert row["remind_at"] == "2026-06-30T21:00:00"
+        assert row["user_id"] == 99999
+        assert row["target_user_id"] == 99999
+        mock_scheduler.add_job.assert_called_once()
+        embed = ctx.send.call_args[1]["embed"]
+        assert "Call Sarah" in embed.description
+
+    @pytest.mark.asyncio
+    async def test_context_inserts_without_scheduling(self, cog, ctx, db_path):
+        with _patch_get_db(db_path), patch("cogs.reminders.scheduler") as mock_scheduler:
+            created = await cog.create_reminder(ctx, message="Grab keys", context="heading_out")
+
+        assert created is True
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = _dict_factory
+            row = await (await db.execute("SELECT * FROM reminders WHERE id = 1")).fetchone()
+
+        assert row["message"] == "Grab keys"
+        assert row["context"] == "heading_out"
+        assert row["remind_at"] is None
+        mock_scheduler.add_job.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_target_other_user(self, cog, ctx, db_path):
+        target = MagicMock()
+        target.id = 88888
+        target.mention = "<@88888>"
+
+        with _patch_get_db(db_path):
+            await cog.create_reminder(
+                ctx, message="Bring the cake", context="heading_out", target=target
+            )
+
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = _dict_factory
+            row = await (await db.execute("SELECT * FROM reminders WHERE id = 1")).fetchone()
+
+        assert row["user_id"] == 99999  # author
+        assert row["target_user_id"] == 88888  # reminded user
+        embed = ctx.send.call_args[1]["embed"]
+        assert "For: <@88888>" in embed.description
+
+    @pytest.mark.asyncio
+    async def test_empty_message_rejected(self, cog, ctx, db_path):
+        with _patch_get_db(db_path):
+            created = await cog.create_reminder(ctx, message="   ", context="heading_out")
+
+        assert created is False
+        async with aiosqlite.connect(db_path) as db:
+            count = (await (await db.execute("SELECT COUNT(*) FROM reminders")).fetchone())[0]
+        assert count == 0
+        ctx.send.assert_called_once()
+
+
 # ── remind before (context-based) ─────────────────────────────────────────
 
 
