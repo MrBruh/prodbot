@@ -206,18 +206,37 @@ TOOLS = [
     _tool("reflect", "Reflect on the user's day from their todos and journal entries."),
     _tool(
         "set_reminder",
-        "Set a reminder for a specific time or before a context like heading out.",
+        "Set a reminder for a specific time or before a context like heading out. "
+        "Provide either remind_at (a timed reminder) or context (a 'before I ...' "
+        "reminder), not both.",
         {
-            "raw_input": {
+            "message": {
                 "type": "string",
                 "description": (
-                    "The reminder restated for parsing, beginning with a token: "
-                    "'at <time> <message>', 'before <context> <message>', or "
-                    "'morning <message>'. Example: 'at 9pm call Sarah'."
+                    "What to be reminded about, without the time/context words or "
+                    "any @mentions. E.g. for 'at 9pm call Sarah' -> 'call Sarah'."
                 ),
-            }
+            },
+            "remind_at": {
+                "type": "string",
+                "description": (
+                    "Absolute ISO 8601 datetime for a timed reminder, e.g. "
+                    "'2026-06-30T21:00:00'. Compute it from the current date/time "
+                    "given in the system prompt (so 'in 2 hours' or 'at 9pm' become "
+                    "concrete). Omit for a context reminder."
+                ),
+            },
+            "context": {
+                "type": "string",
+                "enum": ["heading_out", "morning", "evening"],
+                "description": (
+                    "Use instead of remind_at for a context reminder. Map heading "
+                    "out / leaving / heading home to 'heading_out'. Omit for a timed "
+                    "reminder."
+                ),
+            },
         },
-        ["raw_input"],
+        ["message"],
     ),
     _tool(
         "check_context_reminders",
@@ -260,7 +279,9 @@ TOOLS = [
 ROUTING_SYSTEM_PROMPT = (
     "You are Jarvis, a productivity assistant Discord bot. Decide what the user "
     "wants and call exactly one tool. When several tasks are listed at once, use "
-    "add_todos. If nothing else fits — greetings, small talk, or general "
+    "add_todos. For set_reminder, put only the reminder text in message and give "
+    "either an absolute ISO 8601 remind_at (for a time) or a context (for "
+    "'before I ...'). If nothing else fits — greetings, small talk, or general "
     "questions — call general_chat with a friendly reply."
 )
 
@@ -271,10 +292,16 @@ async def route_command(user_message: str) -> dict:
     Returns ``{"action": <name>, "parameters": {...}}`` for command actions, and
     ``{"action": "general_chat", "parameters": {}, "response": <reply>}`` for chat.
     """
+    # The current time lets set_reminder emit an absolute remind_at directly,
+    # so the NL path no longer needs a second parse_reminder_time call.
+    system = (
+        f"{ROUTING_SYSTEM_PROMPT}\n\nThe current date and time is {datetime.now().isoformat()}."
+    )
+
     message = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=500,
-        system=ROUTING_SYSTEM_PROMPT,
+        system=system,
         tools=TOOLS,
         tool_choice={"type": "any", "disable_parallel_tool_use": True},
         messages=[{"role": "user", "content": user_message}],
