@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 
 import discord
 from discord.ext import commands
@@ -19,10 +20,35 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+AVATAR_PATH = Path(__file__).parent / "assets" / "logo.png"
+_avatar_set = False
+
+
+async def _set_avatar():
+    """Set the bot's avatar to the project logo, once per process.
+
+    on_ready can fire repeatedly (every gateway reconnect), and Discord
+    rate-limits avatar edits, so this runs at most once per run and swallows
+    HTTP errors instead of crashing the bot.
+    """
+    global _avatar_set
+    if _avatar_set:
+        return
+    if not AVATAR_PATH.exists():
+        logger.warning("Avatar file not found at %s; skipping avatar update", AVATAR_PATH)
+        return
+    try:
+        await bot.user.edit(avatar=AVATAR_PATH.read_bytes())
+        logger.info("Set bot avatar from %s", AVATAR_PATH.name)
+        _avatar_set = True
+    except discord.HTTPException:
+        logger.exception("Failed to set bot avatar")
+
 
 @bot.event
 async def on_ready():
     await init_db()
+    await _set_avatar()
     logger.info(f"Logged in as {bot.user}")
 
 
