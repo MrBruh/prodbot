@@ -1,6 +1,7 @@
 import json
 import re
 from datetime import datetime
+from typing import Optional
 
 import anthropic
 
@@ -10,6 +11,7 @@ from config import ANTHROPIC_API_KEY
 def _strip_code_fences(text: str) -> str:
     """Strip markdown code fences from LLM responses."""
     return re.sub(r"^```(?:json)?\s*\n?|```\s*$", "", text.strip())
+
 
 client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -88,63 +90,223 @@ Reply with ONLY the JSON object, nothing else."""
     return json.loads(_strip_code_fences(message.content[0].text))
 
 
+def _tool(
+    name: str,
+    description: str,
+    properties: Optional[dict] = None,
+    required: Optional[list] = None,
+) -> dict:
+    """Build an Anthropic tool definition from its name, description, and schema parts."""
+    input_schema: dict = {
+        "type": "object",
+        "properties": properties or {},
+        "additionalProperties": False,
+    }
+    if required:
+        input_schema["required"] = required
+    return {"name": name, "description": description, "input_schema": input_schema}
+
+
+# One tool per routable action. The schemas carry the parameter docs that used to
+# live in the system prompt, so the model fills them in directly via tool use.
+TOOLS = [
+    _tool(
+        "add_todo",
+        "Add a single task to today's todo list.",
+        {"task": {"type": "string", "description": "The task description."}},
+        ["task"],
+    ),
+    _tool(
+        "add_todos",
+        "Add several tasks to today's todo list at once. Use when the user lists "
+        "multiple tasks, e.g. 'add these: 1. Buy groceries 2. Clean house'.",
+        {
+            "tasks": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "The list of task descriptions.",
+            }
+        },
+        ["tasks"],
+    ),
+    _tool(
+        "list_todos",
+        "Show the user's todo list for a given day.",
+        {
+            "date": {
+                "type": "string",
+                "description": "'today' or an ISO date 'YYYY-MM-DD'. Defaults to today.",
+            }
+        },
+    ),
+    _tool(
+        "complete_todo",
+        "Mark a todo item as done by its numeric ID.",
+        {"task_id": {"type": "integer", "description": "The numeric ID of the task."}},
+        ["task_id"],
+    ),
+    _tool(
+        "remove_todo",
+        "Delete a todo item by its numeric ID.",
+        {"task_id": {"type": "integer", "description": "The numeric ID of the task."}},
+        ["task_id"],
+    ),
+    _tool(
+        "clear_todos",
+        "Remove all todo items for a given day.",
+        {
+            "date": {
+                "type": "string",
+                "description": "'today' or an ISO date 'YYYY-MM-DD'. Defaults to today.",
+            }
+        },
+    ),
+    _tool(
+        "save_link",
+        "Save a URL for the user to read later, optionally with tags.",
+        {
+            "url": {"type": "string", "description": "The URL to save."},
+            "tags": {
+                "type": "string",
+                "description": "Optional space- or comma-separated tags.",
+            },
+        },
+        ["url"],
+    ),
+    _tool(
+        "list_links",
+        "List the user's saved links.",
+        {
+            "filter": {
+                "type": "string",
+                "enum": ["unread", "read", "all"],
+                "description": "Which links to show. Defaults to unread.",
+            }
+        },
+    ),
+    _tool(
+        "add_goal",
+        "Add a long-term goal or bucket-list item.",
+        {
+            "goal": {"type": "string", "description": "The goal text."},
+            "category": {
+                "type": "string",
+                "description": "Optional category, e.g. 'health'. Defaults to 'general'.",
+            },
+        },
+        ["goal"],
+    ),
+    _tool("list_goals", "List the user's goals / bucket list."),
+    _tool(
+        "log_journal",
+        "Add a journal entry for today.",
+        {"entry": {"type": "string", "description": "The journal entry text."}},
+        ["entry"],
+    ),
+    _tool("reflect", "Reflect on the user's day from their todos and journal entries."),
+    _tool(
+        "set_reminder",
+        "Set a reminder for a specific time or before a context like heading out.",
+        {
+            "raw_input": {
+                "type": "string",
+                "description": (
+                    "The reminder restated for parsing, beginning with a token: "
+                    "'at <time> <message>', 'before <context> <message>', or "
+                    "'morning <message>'. Example: 'at 9pm call Sarah'."
+                ),
+            }
+        },
+        ["raw_input"],
+    ),
+    _tool(
+        "check_context_reminders",
+        "Fire the user's context reminders when they say they are heading out, "
+        "leaving, or heading home.",
+        {
+            "context": {
+                "type": "string",
+                "enum": ["heading_out"],
+                "description": "The context to fire. Only 'heading_out' is supported.",
+            }
+        },
+        ["context"],
+    ),
+    _tool("list_reminders", "List the user's active reminders."),
+    _tool(
+        "remove_reminder",
+        "Remove a reminder by its numeric ID.",
+        {"reminder_id": {"type": "integer", "description": "The numeric ID of the reminder."}},
+        ["reminder_id"],
+    ),
+    _tool("clear_reminders", "Remove all of the user's active reminders."),
+    _tool("check_email", "Check the user's email inbox."),
+    _tool("check_mentions", "Check the user's mentions."),
+    _tool("check_notifications", "Check the user's notifications."),
+    _tool(
+        "general_chat",
+        "Respond conversationally when no other action fits — greetings, small "
+        "talk, or general questions. Always include a friendly reply.",
+        {
+            "response": {
+                "type": "string",
+                "description": "The conversational reply to send to the user.",
+            }
+        },
+        ["response"],
+    ),
+]
+
+ROUTING_SYSTEM_PROMPT = (
+    "You are Jarvis, a productivity assistant Discord bot. Decide what the user "
+    "wants and call exactly one tool. When several tasks are listed at once, use "
+    "add_todos. If nothing else fits — greetings, small talk, or general "
+    "questions — call general_chat with a friendly reply."
+)
+
+
 async def route_command(user_message: str) -> dict:
-    """Use Claude to determine user intent from natural language and return structured action."""
-    system_prompt = """You are Jarvis, a productivity assistant Discord bot. Given the user's message, determine what action to take. Respond with JSON only, no other text.
+    """Determine user intent via native Anthropic tool use and return a structured action.
 
-{
-  "action": "<action_name>",
-  "parameters": { ... },
-  "response": "<friendly response if action is general_chat>"
-}
-
-Available actions:
-- add_todo: parameters: {"task": "..."} (single task)
-- add_todos: parameters: {"tasks": ["task1", "task2", ...]} (multiple tasks)
-- list_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
-- complete_todo: parameters: {"task_id": <int>}
-- remove_todo: parameters: {"task_id": <int>}
-- clear_todos: parameters: {"date": "today" or "YYYY-MM-DD"}
-- save_link: parameters: {"url": "...", "tags": "..."}
-- list_links: parameters: {"filter": "unread|read|all"}
-- add_goal: parameters: {"goal": "...", "category": "general"}
-- list_goals: parameters: {}
-- log_journal: parameters: {"entry": "..."}
-- reflect: parameters: {}
-- set_reminder: parameters: {"raw_input": "the full reminder text for further parsing"}
-- check_context_reminders: parameters: {"context": "heading_out|morning|evening"}
-- list_reminders: parameters: {}
-- remove_reminder: parameters: {"reminder_id": <int>}
-- clear_reminders: parameters: {}
-- check_email: parameters: {}
-- check_mentions: parameters: {}
-- check_notifications: parameters: {}
-- general_chat: parameters: {}, response: "your conversational reply"
-
-Examples:
-- "remind me at 9pm to call Sarah" → {"action": "set_reminder", "parameters": {"raw_input": "at 9pm call Sarah"}}
-- "I'm heading out now" → {"action": "check_context_reminders", "parameters": {"context": "heading_out"}}
-- "what do I need to do today?" → {"action": "list_todos", "parameters": {"date": "today"}}
-- "save this link https://example.com" → {"action": "save_link", "parameters": {"url": "https://example.com", "tags": ""}}
-- "how's my day going?" → {"action": "reflect", "parameters": {}}
-- "any new emails?" → {"action": "check_email", "parameters": {}}
-- "hello!" → {"action": "general_chat", "parameters": {}, "response": "Hey there! How can I help you today?"}
-- "add these tasks: 1. Buy groceries 2. Clean house" → {"action": "add_todos", "parameters": {"tasks": ["Buy groceries", "Clean house"]}}
-- "remove all todos for today" → {"action": "clear_todos", "parameters": {"date": "today"}}
-- "remove all reminders" → {"action": "clear_reminders", "parameters": {}}"""
-
+    Returns ``{"action": <name>, "parameters": {...}}`` for command actions, and
+    ``{"action": "general_chat", "parameters": {}, "response": <reply>}`` for chat.
+    """
     message = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=500,
-        system=system_prompt,
+        system=ROUTING_SYSTEM_PROMPT,
+        tools=TOOLS,
+        tool_choice={"type": "any", "disable_parallel_tool_use": True},
         messages=[{"role": "user", "content": user_message}],
     )
 
-    try:
-        return json.loads(_strip_code_fences(message.content[0].text))
-    except json.JSONDecodeError:
+    tool_block = next(
+        (b for b in message.content if getattr(b, "type", None) == "tool_use"),
+        None,
+    )
+
+    # Defensive fallback: no tool_use block means an API/model failure (e.g.
+    # stop_reason == "end_turn"), NOT the old ambiguous-text path. With forced
+    # tool use, ambiguous input now deterministically routes to general_chat.
+    if tool_block is None:
+        text = "".join(
+            getattr(b, "text", "") for b in message.content if getattr(b, "type", None) == "text"
+        )
         return {
             "action": "general_chat",
             "parameters": {},
-            "response": message.content[0].text,
+            "response": text or "I'm not sure what you mean.",
         }
+
+    params = dict(tool_block.input)
+
+    # general_chat carries its reply in the tool input; lift it to the top level
+    # so the return shape matches the original {action, parameters, response}.
+    if tool_block.name == "general_chat":
+        return {
+            "action": "general_chat",
+            "parameters": {},
+            "response": params.get("response", "I'm not sure what you mean."),
+        }
+
+    return {"action": tool_block.name, "parameters": params}
