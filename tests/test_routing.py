@@ -105,16 +105,36 @@ async def test_route_command_reflect(mock_client):
 
 @pytest.mark.asyncio
 @patch("services.claude_service.client")
-async def test_route_command_set_reminder(mock_client):
-    """A set-reminder message routes to set_reminder with raw_input."""
+async def test_route_command_set_reminder_timed(mock_client):
+    """A timed set-reminder message routes to set_reminder with a structured remind_at."""
     mock_client.messages.create = AsyncMock(
-        return_value=_make_mock_tool_response("set_reminder", {"raw_input": "at 9pm call Sarah"})
+        return_value=_make_mock_tool_response(
+            "set_reminder", {"message": "call Sarah", "remind_at": "2026-06-30T21:00:00"}
+        )
     )
 
     result = await route_command("remind me at 9pm to call Sarah")
 
     assert result["action"] == "set_reminder"
-    assert result["parameters"]["raw_input"] == "at 9pm call Sarah"
+    assert result["parameters"]["message"] == "call Sarah"
+    assert result["parameters"]["remind_at"] == "2026-06-30T21:00:00"
+
+
+@pytest.mark.asyncio
+@patch("services.claude_service.client")
+async def test_route_command_set_reminder_context(mock_client):
+    """A context set-reminder message routes to set_reminder with a context."""
+    mock_client.messages.create = AsyncMock(
+        return_value=_make_mock_tool_response(
+            "set_reminder", {"message": "grab keys", "context": "heading_out"}
+        )
+    )
+
+    result = await route_command("remind me to grab keys before I leave")
+
+    assert result["action"] == "set_reminder"
+    assert result["parameters"]["message"] == "grab keys"
+    assert result["parameters"]["context"] == "heading_out"
 
 
 @pytest.mark.asyncio
@@ -195,3 +215,13 @@ def test_general_chat_tool_requires_response():
     """general_chat must require a response so the bot never emits an empty reply."""
     tool = next(t for t in TOOLS if t["name"] == "general_chat")
     assert "response" in tool["input_schema"]["required"]
+
+
+def test_set_reminder_tool_is_structured():
+    """set_reminder emits structured fields (no raw_input) so the NL path skips a 2nd LLM call."""
+    tool = next(t for t in TOOLS if t["name"] == "set_reminder")
+    props = tool["input_schema"]["properties"]
+    assert set(props) == {"message", "remind_at", "context"}
+    assert "raw_input" not in props
+    assert tool["input_schema"]["required"] == ["message"]
+    assert props["context"]["enum"] == ["heading_out", "morning", "evening"]

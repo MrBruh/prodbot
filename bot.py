@@ -124,30 +124,25 @@ async def _handle_reflect(ctx, result):
 
 
 async def _handle_set_reminder(ctx, result):
-    # Phase 2a: keep emitting a raw_input-style string and the existing split.
-    # Known brittleness: a raw_input without a leading at/before/morning token
-    # falls through to the remind group, which may silently do nothing.
-    raw = result["parameters"].get("raw_input", "")
-    parts = raw.split(None, 1)
-    if len(parts) < 2:
+    # The router now emits structured {message, remind_at?, context?}, so we
+    # create the reminder directly via the shared cog method — no second LLM
+    # call. The target (and any @mention markup to strip) comes from the
+    # original message's mentions, mirroring the !remind prefix commands.
+    cog = ctx.bot.get_cog("Reminders")
+    if cog is None:
         return
-    sub, rest = parts[0], parts[1]
-    subcmd = ctx.bot.get_command(f"remind {sub}")
-    if subcmd:
-        if sub == "before":
-            # remind before takes (context, *, message)
-            before_parts = rest.split(None, 1)
-            if len(before_parts) >= 2:
-                await ctx.invoke(subcmd, context=before_parts[0], message=before_parts[1])
-        elif sub == "at":
-            await ctx.invoke(subcmd, text=rest)
-        elif sub == "morning":
-            await ctx.invoke(subcmd, message=rest)
-    else:
-        # Fallback: pass raw text to the remind group
-        cmd = ctx.bot.get_command("remind")
-        if cmd:
-            await ctx.invoke(cmd, text=raw)
+    params = result["parameters"]
+    message = params.get("message", "")
+    target = ctx.message.mentions[0] if ctx.message.mentions else None
+    for mention in ctx.message.mentions:
+        message = message.replace(f"<@{mention.id}>", "").replace(f"<@!{mention.id}>", "")
+    await cog.create_reminder(
+        ctx,
+        message=message,
+        remind_at=params.get("remind_at"),
+        context=params.get("context"),
+        target=target,
+    )
 
 
 async def _handle_check_context_reminders(ctx, result):
