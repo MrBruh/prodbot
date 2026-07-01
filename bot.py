@@ -8,6 +8,7 @@ from discord.ext import commands
 from config import BOT_CHANNEL_NAME, DISCORD_TOKEN
 from database import init_db
 from services.claude_service import route_command
+from services.gmail_oauth import start_oauth_server
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -280,6 +281,8 @@ async def main():
         await bot.load_extension("cogs.journal")
         await bot.load_extension("cogs.reminders")
         await bot.load_extension("cogs.notifications")
+        # Serve the Gmail OAuth callback alongside the bot (no-op if unconfigured).
+        await start_oauth_server(bot)
         await bot.start(DISCORD_TOKEN)
 
 
