@@ -1,11 +1,11 @@
 import json
 import re
-from datetime import datetime
 from typing import Optional
 
 import anthropic
 
 from config import ANTHROPIC_API_KEY
+from services.timeutil import now as tz_now
 
 
 def _strip_code_fences(text: str) -> str:
@@ -62,7 +62,7 @@ async def parse_reminder_time(text: str) -> dict:
         context: context name or None (for context-based reminders)
         message: the reminder message
     """
-    now = datetime.now().isoformat()
+    now = tz_now().isoformat()
 
     prompt = f"""Parse this reminder request and return JSON only. Current time: {now}
 
@@ -294,9 +294,7 @@ async def route_command(user_message: str) -> dict:
     """
     # The current time lets set_reminder emit an absolute remind_at directly,
     # so the NL path no longer needs a second parse_reminder_time call.
-    system = (
-        f"{ROUTING_SYSTEM_PROMPT}\n\nThe current date and time is {datetime.now().isoformat()}."
-    )
+    system = f"{ROUTING_SYSTEM_PROMPT}\n\nThe current date and time is {tz_now().isoformat()}."
 
     message = await client.messages.create(
         model="claude-haiku-4-5-20251001",

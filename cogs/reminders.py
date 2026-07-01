@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import Optional
 
 import discord
@@ -9,6 +8,8 @@ from config import BOT_CHANNEL_NAME
 from database import get_db
 from services.claude_service import parse_reminder_time
 from services.scheduler_service import scheduler, start_scheduler
+from services.timeutil import now as tz_now
+from services.timeutil import parse_dt
 
 logger = logging.getLogger(__name__)
 
@@ -25,22 +26,35 @@ class Reminders(commands.Cog):
     async def _reschedule_reminders(self):
         """Reschedule future timed reminders into the in-memory scheduler on startup."""
         await self.bot.wait_until_ready()
-        now = datetime.now().isoformat()
+        current = tz_now()
         async with get_db() as db:
             db.row_factory = _dict_factory
-            # Reschedule future reminders
             cursor = await db.execute(
-                "SELECT * FROM reminders WHERE remind_at IS NOT NULL AND remind_at > ? AND fired = 0",
-                (now,),
+                "SELECT * FROM reminders WHERE remind_at IS NOT NULL AND fired = 0",
             )
-            future = await cursor.fetchall()
+            rows = await cursor.fetchall()
+
+            # Partition into future vs. missed by comparing parsed, timezone-aware
+            # datetimes — not lexicographic ISO strings, which misclassify times
+            # from a different zone/format and fire not-yet-due reminders.
+            future, missed = [], []
+            for r in rows:
+                try:
+                    when = parse_dt(r["remind_at"])
+                except (TypeError, ValueError):
+                    logger.warning(
+                        "Skipping reminder #%s with unparseable time %r",
+                        r["id"],
+                        r["remind_at"],
+                    )
+                    continue
+                (missed if when <= current else future).append(r)
 
             for r in future:
-                remind_at = datetime.fromisoformat(r["remind_at"])
                 scheduler.add_job(
                     _send_reminder,
                     "date",
-                    run_date=remind_at,
+                    run_date=parse_dt(r["remind_at"]),
                     args=[
                         self.bot,
                         r["channel_id"],
@@ -53,13 +67,6 @@ class Reminders(commands.Cog):
 
             if future:
                 logger.info("Rescheduled %d future reminder(s)", len(future))
-
-            # Fire missed reminders (past-due)
-            cursor = await db.execute(
-                "SELECT * FROM reminders WHERE remind_at IS NOT NULL AND remind_at <= ? AND fired = 0",
-                (now,),
-            )
-            missed = await cursor.fetchall()
 
             if not missed:
                 return
@@ -113,7 +120,7 @@ class Reminders(commands.Cog):
             desc = f"**{message}**\nContext: `{context}`"
         elif remind_at:
             try:
-                when = datetime.fromisoformat(remind_at)
+                when = parse_dt(remind_at)
             except (TypeError, ValueError):
                 await ctx.send("Could not parse the reminder time. Please try again.")
                 return False
