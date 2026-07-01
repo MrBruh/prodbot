@@ -4,7 +4,13 @@ from typing import Dict, List
 import discord
 from discord.ext import commands
 
-from services.gmail_service import get_unread_emails
+from services.gmail_oauth import create_pending
+from services.gmail_service import (
+    delete_account,
+    get_account,
+    get_unread_emails,
+    gmail_configured,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +40,61 @@ class Notifications(commands.Cog):
 
     @commands.group(name="email", invoke_without_command=True)
     async def email(self, ctx):
-        """Email commands. Usage: !email check"""
-        await ctx.send("Usage: `!email check`")
+        """Email commands. Usage: !email register | !email check | !email forget"""
+        await ctx.send("Usage: `!email register` · `!email check` · `!email forget`")
+
+    @email.command(name="register")
+    async def email_register(self, ctx):
+        """Connect your Gmail (read-only) so the bot can check it for you."""
+        if not gmail_configured():
+            await ctx.send("Email isn't set up on this bot yet.")
+            return
+
+        auth_url = create_pending(ctx.author.id)
+        embed = discord.Embed(
+            title="Connect your Gmail",
+            description=(
+                "Click below to grant **read-only** access — the bot only ever reads the "
+                "sender and subject of your unread mail, never the contents.\n\n"
+                f"**[Authorize with Google]({auth_url})**\n\n"
+                "This link is personal to you and expires in 10 minutes."
+            ),
+            color=discord.Color.blurple(),
+        )
+        try:
+            await ctx.author.send(embed=embed)
+        except discord.Forbidden:
+            await ctx.send(
+                "I couldn't DM you — enable **Direct Messages** from server members "
+                "(Privacy Settings) and run `!email register` again."
+            )
+            return
+
+        if ctx.guild is not None:
+            await ctx.send(
+                "📬 Check your DMs — I've sent you a private link to connect your email."
+            )
 
     @email.command(name="check")
     async def email_check(self, ctx):
-        """Show unread emails. Usage: !email check"""
+        """Show your unread emails. Usage: !email check"""
+        if not gmail_configured():
+            await ctx.send("Email isn't set up on this bot yet.")
+            return
+        if not await get_account(ctx.author.id):
+            await ctx.send(
+                "You haven't connected an email yet. Run `!email register` to link your Gmail."
+            )
+            return
+
         async with ctx.typing():
-            emails = await get_unread_emails()
+            emails = await get_unread_emails(ctx.author.id)
 
         if emails is None:
-            await ctx.send("Gmail is not configured. Add credentials.json to enable email checks.")
+            await ctx.send(
+                "I couldn't reach your Gmail — your access may have expired. "
+                "Run `!email register` to reconnect."
+            )
             return
 
         if not emails:
@@ -62,6 +112,14 @@ class Notifications(commands.Cog):
                 inline=False,
             )
         await ctx.send(embed=embed)
+
+    @email.command(name="forget")
+    async def email_forget(self, ctx):
+        """Disconnect your Gmail from the bot. Usage: !email forget"""
+        if await delete_account(ctx.author.id):
+            await ctx.send("Disconnected your email — the bot no longer has access.")
+        else:
+            await ctx.send("You don't have an email connected.")
 
     @commands.command(name="mentions")
     async def mentions(self, ctx):
@@ -86,15 +144,24 @@ class Notifications(commands.Cog):
 
     @commands.command(name="notifications")
     async def notifications(self, ctx):
-        """Combined: unread emails + Discord mentions. Usage: !notifications"""
-        emails = await get_unread_emails()
+        """Combined: your unread emails + Discord mentions. Usage: !notifications"""
+        registered = gmail_configured() and bool(await get_account(ctx.author.id))
+        emails = await get_unread_emails(ctx.author.id) if registered else None
         mentions_found = await self._get_recent_mentions(ctx)
 
         embed = discord.Embed(title="Notifications", color=discord.Color.dark_orange())
 
         # Email section
-        if emails is None:
-            embed.add_field(name="Email", value="Gmail not configured", inline=False)
+        if not registered:
+            embed.add_field(
+                name="Email", value="Not connected — run `!email register`", inline=False
+            )
+        elif emails is None:
+            embed.add_field(
+                name="Email",
+                value="Couldn't reach Gmail — try `!email register` again",
+                inline=False,
+            )
         elif not emails:
             embed.add_field(name="Email", value="No unread emails", inline=False)
         else:
