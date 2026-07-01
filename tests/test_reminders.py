@@ -1,6 +1,6 @@
 """Tests for the Reminders cog."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
@@ -9,6 +9,7 @@ import pytest_asyncio
 
 import database
 from cogs.reminders import Reminders, _dict_factory
+from services.timeutil import now as tz_now
 
 
 @pytest_asyncio.fixture
@@ -308,7 +309,7 @@ class TestRemindMorning:
 class TestMissedReminders:
     @pytest.mark.asyncio
     async def test_fires_missed_reminders_on_startup(self, cog, bot, db_path):
-        past_time = (datetime.now() - timedelta(minutes=10)).isoformat()
+        past_time = (tz_now() - timedelta(minutes=10)).isoformat()
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 "INSERT INTO reminders (message, remind_at, user_id, target_user_id, channel_id) VALUES (?, ?, ?, ?, ?)",
@@ -344,3 +345,28 @@ class TestMissedReminders:
             await cog._reschedule_reminders()
 
         bot.get_channel.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_future_reminder_is_rescheduled_not_fired(self, cog, bot, db_path):
+        """Regression (#6): a not-yet-due reminder must be rescheduled, not fired."""
+        future_time = (tz_now() + timedelta(hours=2)).isoformat()
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "INSERT INTO reminders (message, remind_at, user_id, target_user_id, channel_id) VALUES (?, ?, ?, ?, ?)",
+                ("Vacuum the floor", future_time, 99999, 99999, 12345),
+            )
+            await db.commit()
+
+        bot.wait_until_ready = AsyncMock()
+        bot.get_channel = MagicMock()
+
+        with _patch_get_db(db_path), patch("cogs.reminders.scheduler") as mock_scheduler:
+            await cog._reschedule_reminders()
+
+        # Not fired as "missed"...
+        bot.get_channel.assert_not_called()
+        # ...but scheduled for later, and left in the DB.
+        mock_scheduler.add_job.assert_called_once()
+        async with aiosqlite.connect(db_path) as db:
+            count = (await (await db.execute("SELECT COUNT(*) FROM reminders")).fetchone())[0]
+        assert count == 1
